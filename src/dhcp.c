@@ -456,7 +456,7 @@ dhcp_send_request(struct attacks *attacks)
 
 
 int8_t
-dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int8_t *mac_server, u_int8_t *mac_victim)
+dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int8_t *mac_server, u_int8_t *mac_victim) 
 {
     struct dhcp_data *dhcp_data;
 
@@ -603,7 +603,9 @@ void dhcp_th_dos_send_discover( void *arg )
     dhcp_th_dos_send_discover_exit(attacks);
 }
 
-
+/*********************************************/
+/* Stop the  DoS attack sending DHCPDISCOVER */
+/*********************************************/
 void dhcp_th_dos_send_discover_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
@@ -808,7 +810,11 @@ void dhcp_th_rogue_server_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
-
+/*********************************/
+/* DoS attack sending DHCPRELEASE */
+/*********************************/
+/* This is the one that did not send anything*/
+/*This code will be run by each thread while running this attack*/
 void dhcp_th_dos_send_release( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
@@ -836,12 +842,15 @@ void dhcp_th_dos_send_release( void *arg )
     memcpy((void *)&aux_long1, (void *)param[DHCP_DOS_SEND_RELEASE_SERVER].value, 4);
 
     if (dhcp_send_arp_request(attacks, aux_long1) < 0)
+    /* build and send an ARP request, write an error to the log and quit if returns -1
+    This error can happen if we can't build the ARP header / can't build the Ethernet header / there is a write error in libnet */
     {
         write_log(0, "Error in dhcp_send_arp_request\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
 
-    /* MAC from the Server */
+    /* MAC from the Server - wait for a packet and try to learn the MAC address of the server
+    Quit if returned -1. This error will occur if there's errors with allocating memory or the address is not learned by the end of waiting time*/
     if (dhcp_learn_mac(attacks, aux_long1, arp_server) < 0)
     {
         write_log(0, "Error in dhcp_learn_mac for the server\n");
@@ -849,7 +858,7 @@ void dhcp_th_dos_send_release( void *arg )
     }
 
     /* loop */
-
+    /* I believe the condition in english is "while current IP is lesser than the value of the last IP and while the attack is not stopped" */
     while ((aux_long <= (*(u_int32_t *)param[DHCP_DOS_SEND_RELEASE_END_IP].value)) 
               && !attacks->attack_th.stop) 
     {
@@ -869,6 +878,11 @@ void dhcp_th_dos_send_release( void *arg )
         if (dhcp_send_release(attacks, aux_long1, aux_long, arp_server, arp_mac) < 0)
         {
             write_log(0, "Error in dhcp_send_release\n");
+            /*If I had to make an educated guess, this next line might be causing trouble
+              As It will quit the entire thread on an error in the dhcp_send_release
+              And all of the addresses that are after it in the loop will not get the chance to run
+              If the error occurs on the first IP, then others won't be attempted, I feel like this might be the cause
+              But I am yet to test it*/
             dhcp_th_dos_send_release_exit(attacks);
         }
 
