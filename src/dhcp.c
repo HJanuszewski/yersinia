@@ -489,7 +489,13 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 
     dhcp_data->options_len = 10;
 
-    dhcp_send_packet(attacks);
+    // Code above is pretty much moving data from one place to another and not really doing much with it, it's all a setup for the dhcp_send_packet
+    // Let's add some error handling in here, the same way it is implemented in dhcp_send_packet
+    if (dhcp_send_packet(attacks) < 0)
+    {
+        write_log(0,"Error in dhcp_send_packet\n");
+        return -1;
+    }
 
     return 0;
 }
@@ -1028,7 +1034,7 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac)
     {
         rec_packets++;
 
-        thread_usleep(800000);
+        thread_usleep(800000); //have the thread sleep for 0,8 seconds
 
         if ( interfaces_get_packet( attacks->used_ints, NULL, &attacks->attack_th.stop, p_data.header, p_data.packet, PROTO_ARP, 5 ) == NULL ) 
         {
