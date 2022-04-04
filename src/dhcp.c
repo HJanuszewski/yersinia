@@ -457,7 +457,7 @@ dhcp_send_request(struct attacks *attacks)
 
 int8_t
 dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int8_t *mac_server, u_int8_t *mac_victim) 
-{
+{ // This bit is called when it's time to actually send the release packet, thus it also might be the cause of the packets not being sent 
     struct dhcp_data *dhcp_data;
 
     dhcp_data = attacks->data;
@@ -603,9 +603,9 @@ void dhcp_th_dos_send_discover( void *arg )
     dhcp_th_dos_send_discover_exit(attacks);
 }
 
-/*********************************************/
-/* Stop the  DoS attack sending DHCPDISCOVER */
-/*********************************************/
+/************************************************/
+/* End / finish DoS attack sending DHCPDISCOVER */
+/************************************************/
 void dhcp_th_dos_send_discover_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
@@ -615,8 +615,10 @@ void dhcp_th_dos_send_discover_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
-
-void dhcp_th_rogue_server( void *arg )
+/*********************/
+/* Rogue DHCP server */
+/*********************/
+void dhcp_th_rogue_server( void *arg ) // according to the testing reports, this one seems to be working fine, thus I won't mess around with it
 {
     struct attacks *attacks = (struct attacks *) arg ;
     struct dhcp_data *dhcp_data = (struct dhcp_data *)attacks->data;
@@ -801,6 +803,9 @@ void dhcp_th_rogue_server( void *arg )
 }
 
 
+/**********************************/
+/* End / Finish Rogue DHCP server */
+/**********************************/
 void dhcp_th_rogue_server_exit( struct attacks *attacks )
 {
     attack_th_exit( attacks );
@@ -810,9 +815,9 @@ void dhcp_th_rogue_server_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
-/*********************************/
+/**********************************/
 /* DoS attack sending DHCPRELEASE */
-/*********************************/
+/**********************************/
 /* This is the one that did not send anything*/
 /*This code will be run by each thread while running this attack*/
 void dhcp_th_dos_send_release( void *arg )
@@ -873,7 +878,7 @@ void dhcp_th_dos_send_release( void *arg )
         if (dhcp_learn_mac(attacks, aux_long, arp_mac) < 0)
         {
             write_log(0, "Error in dhcp_learn_mac\n");
-/*            dhcp_dos_send_release_exit(attacks);*/
+            /*dhcp_dos_send_release_exit(attacks);*/
         } else
         if (dhcp_send_release(attacks, aux_long1, aux_long, arp_server, arp_mac) < 0)
         {
@@ -882,7 +887,7 @@ void dhcp_th_dos_send_release( void *arg )
               As It will quit the entire thread on an error in the dhcp_send_release
               And all of the addresses that are after it in the loop will not get the chance to run
               If the error occurs on the first IP, then others won't be attempted, I feel like this might be the cause
-              But I am yet to test it*/
+              But I am yet to test it. In theory other threads should still work and send stuff*/
             dhcp_th_dos_send_release_exit(attacks);
         }
 
@@ -894,6 +899,9 @@ void dhcp_th_dos_send_release( void *arg )
 }
 
 
+/***********************************************/
+/* End / Finish DoS attack sending DHCPRELEASE */
+/***********************************************/
 void dhcp_th_dos_send_release_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
