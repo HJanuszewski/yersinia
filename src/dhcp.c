@@ -473,13 +473,13 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 
     dhcp_data->op = LIBNET_DHCP_REQUEST;
     dhcp_data->flags = 0;
-    /* FIXME: libnet consistency */
+    /* FIXME: libnet consistency */ // !? HUH
     dhcp_data->ciaddr = htonl(ip);
 
 /*    memcpy((void *)&dhcp_data->ciaddr, (void *)&ip, 4);*/
 
     memcpy((void *)dhcp_data->chaddr, (void *)mac_victim, ETHER_ADDR_LEN);
-
+    //I have no clue why it starts at [2] and google is not very helpful to me rn
     dhcp_data->options[2] = LIBNET_DHCP_MSGRELEASE;
     dhcp_data->options[3] = LIBNET_DHCP_SERVIDENT;
     dhcp_data->options[4] = 4;
@@ -1117,9 +1117,10 @@ dhcp_send_packet(struct attacks *attacks)
                 lhandler,                               /* libnet handle */
                 0);                                     /* libnet id */
 
-            if (t == -1) 
+            if (t == -1) // I don't know if thread_libnet_error's also pop up in the main log, so it shouldn't hurt to add regular ones too
             {
                 thread_libnet_error( "Can't build dhcp packet",lhandler);
+                write_log(0,"Can't build dhcp packet");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1138,6 +1139,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1) 
             {
                 thread_libnet_error( "Can't build udp datagram",lhandler);
+                write_log(0,"Can't build udp datagram");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1161,6 +1163,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1) 
             {
                 thread_libnet_error("Can't build ipv4 packet",lhandler);
+                write_log(0,"Can't build ipv4 packet");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1178,6 +1181,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1)
             {
                 thread_libnet_error("Can't build ethernet header",lhandler);
+                write_log(0,"Can't build ethernet header");
                 libnet_clear_packet(lhandler);
                 return -1;
             }
@@ -1189,6 +1193,7 @@ dhcp_send_packet(struct attacks *attacks)
 
             if (sent == -1) {
                 thread_libnet_error("libnet_write error", lhandler);
+                write_log(0,"libnet_write error");
                 libnet_clear_packet(lhandler);
                 return -1;
             }
