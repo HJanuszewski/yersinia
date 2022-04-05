@@ -862,6 +862,7 @@ void dhcp_th_dos_send_release( void *arg )
 
     /* MAC from the Server - wait for a packet and try to learn the MAC address of the server
     Quit if returned -1. This error will occur if there's errors with allocating memory or the address is not learned by the end of waiting time*/
+    //NOTE - THE LOGS SHOW THAT IT FAILS ON THIS IF AND QUITS
     if (dhcp_learn_mac(attacks, aux_long1, arp_server) < 0)
     {
         write_log(1, "Error in dhcp_learn_mac for the server\n");
@@ -919,7 +920,7 @@ void dhcp_th_dos_send_release_exit( struct attacks *attacks )
 
 
 int8_t
-dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
+dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible that this one is broken, in a way that it creates valid, but malformed requests
 {
     libnet_ptag_t t;
     libnet_t *lhandler;
@@ -958,6 +959,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
         if (t == -1)
         {
             thread_libnet_error("Can't build arp header",lhandler);
+            write_log(1,"Can't build arp header!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -978,6 +980,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
         if (t == -1)
         {
             thread_libnet_error("Can't build ethernet header",lhandler);
+            write_log(1,"Can't build ethernet header!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -989,6 +992,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
 
         if (sent == -1) {
             thread_libnet_error("libnet_write error", lhandler);
+            write_log(1,"Libnet write erre!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -1001,8 +1005,9 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
 
 
 int8_t
-dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac)
-{
+dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //This function is most likely why the DHCP Release DOS does not work
+
+{//another possibility is that it's fine, but timing out because the previous one is busted
     struct dhcp_data *dhcp_data;
     struct libnet_ethernet_hdr *ether;
     int8_t gotit=0;
@@ -1030,14 +1035,15 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac)
                  
     /* Ok, we are waiting for an ARP packet for 5 seconds, and we'll wait
      * forever (50 ARP packets) for the real packet... */
-    while ( !attacks->attack_th.stop && !gotit & ( rec_packets < 50 ) )
+    while ( !attacks->attack_th.stop && !gotit & ( rec_packets < 500 ) ) //Note: I increased the wait time 10x, to see if it would still time out
     {
         rec_packets++;
 
-        thread_usleep(800000); //have the thread sleep for 0,8 seconds
+        thread_usleep(8000000); //have the thread sleep for 8 seconds
 
         if ( interfaces_get_packet( attacks->used_ints, NULL, &attacks->attack_th.stop, p_data.header, p_data.packet, PROTO_ARP, 5 ) == NULL ) 
         {
+            //Here is the exact moment that the DHCP release DoS fails. If other atacks can make use of this func normally, then it means that ir's an issue with data sent?
             write_log(1, "Timeout waiting for an ARP Reply...\n");
             break;
         }
