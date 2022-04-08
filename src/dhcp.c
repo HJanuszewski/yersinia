@@ -939,8 +939,8 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
     {
       iface_data = (struct interface_data *) dlist_data(p);
       lhandler = iface_data->libnet_handler;
-        write_log(1,"iface_sata->ipaddr"+iface_data->ipaddr + " \n"); //THE VALUE  THAT IS GOING TO BE SET AS THE SOURCE IP ADDRESS WILL BE DISPLAYED IN THE LOG 
-        write_log(1,"dhcp_data->yaddr"+dhcp_data->yaddr + " \n"); //Checking if the dhcp_data has the correct address maybe? 
+        write_log(1,strcat("iface_sata->ipaddr ",iface_data->ipaddr)); //THE VALUE  THAT IS GOING TO BE SET AS THE SOURCE IP ADDRESS WILL BE DISPLAYED IN THE LOG 
+        write_log(1,strcat("dhcp_data->yiaddr ",dhcp_data->yiaddr)); //Checking if the dhcp_data has the correct address maybe? 
         aux_long = inet_addr(iface_data->ipaddr); //I think this line right here is what is broken. It is supposed to provide the IP address of the sender, however the packets in the wireshark capture say that ARP reply hsould go to 255.255.255.255
         t = libnet_build_arp(
                     ARPHRD_ETHER, /* hardware addr */
