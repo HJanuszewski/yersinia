@@ -410,11 +410,15 @@ static struct attack_param dhcp_rogue_server_params[] = {
 #define DHCP_DOS_SEND_RELEASE_SERVER     0
 #define DHCP_DOS_SEND_RELEASE_START_IP   1 
 #define DHCP_DOS_SEND_RELEASE_END_IP     2 
+#define DHCP_DOS_SEND_RELEASE_CLIENT_IP  3
 
+
+// add the client IP field here I guess
 static struct attack_param dhcp_dos_send_release_params[] = {
     { NULL, "Server ID",               4, FIELD_IP,  15, NULL },
     { NULL, "Start IP",                4, FIELD_IP,  15, NULL },
-    { NULL, "End IP",                  4, FIELD_IP,  15, NULL }
+    { NULL, "End IP",                  4, FIELD_IP,  15, NULL },
+    { NULL, "Client IP",               4, FIELD_IP,  15, NULL }
 };
 
 #define DHCP_ATTACK_SEND_RAW           0

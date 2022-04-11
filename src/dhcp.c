@@ -926,20 +926,26 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
     libnet_t *lhandler;
     int32_t sent;
     struct dhcp_data *dhcp_data;
+    struct attack_param * param = NULL;
     char *mac_dest = "\xff\xff\xff\xff\xff\xff"; //send to broadcast
     char *mac_source = "\x00\x00\x00\x00\x00\x00";
 /*    int8_t *ip_source="\x00\x00\x00\x00";*/
-    u_int32_t aux_long;
+    u_int32_t *aux_long; // I feel like this should be a pointer? might be wrong, but it's worth a try
    dlist_t *p;
    struct interface_data *iface_data;
 
     dhcp_data = attacks->data;
-
+    param = attacks->params;
+    
+    
+    
+    
    for (p = attacks->used_ints->list; p; p = dlist_next(attacks->used_ints->list, p))
     {
       iface_data = (struct interface_data *) dlist_data(p);
       lhandler = iface_data->libnet_handler;
-        aux_long = inet_addr(iface_data->ipaddr); //I think this line right here is what is broken. It is supposed to provide the IP address of the sender, however the packets in the wireshark capture say that ARP reply hsould go to 255.255.255.255
+        //aux_long = inet_addr(iface_data->ipaddr); //I think this line right here is what is broken. It is supposed to provide the IP address of the sender, however the packets in the wireshark capture say that ARP reply hsould go to 255.255.255.255
+        memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_CLIENT_IP].value, 4); // I have no clue what I'm doing, I saw this in other part of the script and hope it works lmao
         t = libnet_build_arp(
                     ARPHRD_ETHER, /* hardware addr */
                     ETHERTYPE_IP, /* protocol addr */
