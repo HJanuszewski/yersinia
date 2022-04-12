@@ -823,7 +823,11 @@ void dhcp_th_rogue_server_exit( struct attacks *attacks )
 
 
 
-u_int32_t flip_ip(u_int32_t ip)
+u_int32_t flip_ip(u_int32_t ip) 
+/* in DHCP release DOS, IP addresses appeared to be flipped in the pcaps
+ for example as 1.1.168.192 instead of 129.168.1.1 
+ this function is called to use bitwise magic to flip them back in order
+*/
 {
     u_int32_t leftmost,leftmiddle,rightmiddle,rightmost,flipped;
     
@@ -969,7 +973,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
         //aux_long = inet_addr(iface_data->ipaddr); //I think this line right here is what is broken. It is supposed to provide the IP address of the sender, however the packets in the wireshark capture say that ARP reply hsould go to 255.255.255.255
         memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_CLIENT_IP].value, 4); // I have no clue what I'm doing, I saw this in other part of the script and hope it works lmao
         aux_long = flip_ip(aux_long);
-        
+
         t = libnet_build_arp(
                     ARPHRD_ETHER, /* hardware addr */
                     ETHERTYPE_IP, /* protocol addr */
