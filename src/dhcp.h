@@ -384,6 +384,7 @@ void   dhcp_th_rogue_server_exit(struct attacks *);
 void   dhcp_th_dos_send_release(void *);
 void   dhcp_th_dos_send_release_exit(struct attacks *);
 
+u_int32_t flip_ip(u_int32_t); // used as helper in dhcp_th_dos_send_release()
 
 #define DHCP_ROGUE_SERVER     0
 #define DHCP_ROGUE_START_IP   1 
@@ -462,6 +463,8 @@ int8_t dhcp_send_arp_request(struct attacks *, u_int32_t);
 int8_t dhcp_learn_mac(struct attacks *, u_int32_t, u_int8_t *);
 int8_t dhcp_init_comms_struct(struct term_node *);
 int8_t dhcp_end(struct term_node *);
+
+
 
 extern void   thread_libnet_error( char *, libnet_t *);
 extern int8_t vrfy_bridge_id( char *, u_int8_t * );

