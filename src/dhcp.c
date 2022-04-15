@@ -464,7 +464,8 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 
     dhcp_data = attacks->data;
 
-    mac_before_spoof = dhcp_data->mac_source;
+    //mac_before_spoof = dhcp_data->mac_source;
+    memcpy((void *)mac_before_spoof,(void *)dhcp_data->mac_sourse,ETHER_ADDR_LEN);
 
     memcpy((void *)dhcp_data->mac_source, (void *)mac_victim, ETHER_ADDR_LEN); //as this is never reverted, the false MAC stays for next requests
     memcpy((void *)dhcp_data->mac_dest, (void *)mac_server, ETHER_ADDR_LEN);
@@ -497,12 +498,14 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
     // Let's add some error handling in here, the same way it is implemented in dhcp_send_packet
     if (dhcp_send_packet(attacks) < 0)
     {
-        dhcp_data->mac_source = mac_before_spoof;
+        //dhcp_data->mac_source = mac_before_spoof;
+        memcpy((void *)dhcp_data->mac_source,(void *)mac_before_spoof,ETHER_ADDR_LEN);
         write_log(1,"Error in dhcp_send_packet\n");
         return -1;
     }
 
-    dhcp_data->mac_source = mac_before_spoof;
+    //dhcp_data->mac_source = mac_before_spoof;
+    memcpy((void *)dhcp_data->mac_source,(void *)mac_before_spoof,ETHER_ADDR_LEN);
     return 0;
 }
 
