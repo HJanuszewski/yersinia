@@ -491,8 +491,13 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
     /* server identification = destination ip */
     memcpy((void *) &dhcp_data->options[5], (void *) &dhcp_data->dip, sizeof(u_int32_t));
     dhcp_data->options[9] = LIBNET_DHCP_END;
-    dhcp_data->options[10] = LIBNET_DHCP_PAD;
-    dhcp_data->options_len = 11;
+    for (int i = 10; i < 45; i++)
+    {
+        dhcp_data->options[i] = LIBNET_DHCP_PAD;
+        // in reality I doubt that padding plays any role in the attack being broken
+        // however imitating a legitimate packet (captured one contained this amoun of padding) is the best lead right now
+    }
+    dhcp_data->options_len = 54;
 
     // Code above is pretty much moving data from one place to another and not really doing much with it, it's all a setup for the dhcp_send_packet
     // Let's add some error handling in here, the same way it is implemented in dhcp_send_packet
