@@ -1202,7 +1202,7 @@ dhcp_send_packet(struct attacks *attacks)
                 + dhcp_data->options_len,                       /* length */
                 0x00,                                           /* TOS */ //changed from 0x10 to 0x00 to match legit packet
                 0x5ab6,                                         /* IP ID */ //changed to a random value to match legit packet's inclusion
-                0,                                              /* IP Frag */
+                IP_DF,                                          /* IP Frag */ //changed from 0 to don't fragment to match legit packet
                 64,                                             /* TTL */ //changed from 16 to 64 to match legit packet
                 IPPROTO_UDP,                                    /* protocol */
                 0,                                              /* checksum */
