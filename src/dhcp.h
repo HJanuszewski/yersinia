@@ -384,6 +384,7 @@ void   dhcp_th_rogue_server_exit(struct attacks *);
 void   dhcp_th_dos_send_release(void *);
 void   dhcp_th_dos_send_release_exit(struct attacks *);
 
+u_int32_t flip_ip(u_int32_t); // used as helper in dhcp_th_dos_send_release()
 
 #define DHCP_ROGUE_SERVER     0
 #define DHCP_ROGUE_START_IP   1 
@@ -410,11 +411,15 @@ static struct attack_param dhcp_rogue_server_params[] = {
 #define DHCP_DOS_SEND_RELEASE_SERVER     0
 #define DHCP_DOS_SEND_RELEASE_START_IP   1 
 #define DHCP_DOS_SEND_RELEASE_END_IP     2 
+#define DHCP_DOS_SEND_RELEASE_CLIENT_IP  3
 
+
+// add the client IP field here I guess
 static struct attack_param dhcp_dos_send_release_params[] = {
     { NULL, "Server ID",               4, FIELD_IP,  15, NULL },
     { NULL, "Start IP",                4, FIELD_IP,  15, NULL },
-    { NULL, "End IP",                  4, FIELD_IP,  15, NULL }
+    { NULL, "End IP",                  4, FIELD_IP,  15, NULL },
+    { NULL, "Client IP",               4, FIELD_IP,  15, NULL }
 };
 
 #define DHCP_ATTACK_SEND_RAW           0
@@ -458,6 +463,8 @@ int8_t dhcp_send_arp_request(struct attacks *, u_int32_t);
 int8_t dhcp_learn_mac(struct attacks *, u_int32_t, u_int8_t *);
 int8_t dhcp_init_comms_struct(struct term_node *);
 int8_t dhcp_end(struct term_node *);
+
+
 
 extern void   thread_libnet_error( char *, libnet_t *);
 extern int8_t vrfy_bridge_id( char *, u_int8_t * );

