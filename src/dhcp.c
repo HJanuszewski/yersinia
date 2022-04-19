@@ -1200,10 +1200,10 @@ dhcp_send_packet(struct attacks *attacks)
             t = libnet_build_ipv4(
                 LIBNET_IPV4_H + LIBNET_UDP_H + LIBNET_DHCPV4_H
                 + dhcp_data->options_len,                       /* length */
-                0x10,                                           /* TOS */
-                0,                                              /* IP ID */
+                0x00,                                           /* TOS */ //changed from 0x10 to 0x00 to match legit packet
+                0x5ab6,                                         /* IP ID */ //changed to a random value to match legit packet's inclusion
                 0,                                              /* IP Frag */
-                16,                                             /* TTL */
+                64,                                             /* TTL */ //changed from 16 to 64 to match legit packet
                 IPPROTO_UDP,                                    /* protocol */
                 0,                                              /* checksum */
                 dhcp_data->sip,                                 /* src ip */
