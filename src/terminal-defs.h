@@ -175,7 +175,7 @@
 
 #define ALL_ATTACK_THREADS 0
 
-#define MAX_THREAD_ATTACK 5
+#define MAX_THREAD_ATTACK 7 // changed as a test for DHCP discover DoS
 
 #define MAX_TLV          20
 #define MAX_VALUE_LENGTH 20
