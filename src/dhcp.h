@@ -422,15 +422,6 @@ static struct attack_param dhcp_dos_send_release_params[] = {
     { NULL, "Client IP",               4, FIELD_IP,  15, NULL }
 };
 
-#define DHCP_DOS_SEND_DISCOVER_RATE 0
-
-static struct attack_param dhcp_dos_send_discover_params[] = {
-
-    { NULL, "Rate (packets/sec)",       4, FIELD_HEX, 8, NULL}
-};
-
-
-
 #define DHCP_ATTACK_SEND_RAW           0
 #define DHCP_ATTACK_DOS_SEND_DISCOVER  1
 #define DHCP_ATTACK_ROGUE_SERVER       2
@@ -439,8 +430,7 @@ static struct attack_param dhcp_dos_send_discover_params[] = {
 static struct _attack_definition dhcp_attack[] = {
   { DHCP_ATTACK_SEND_RAW,          "sending RAW packet",        NONDOS, SINGLE,    dhcp_th_send_raw,      NULL, 0 },
 /*  { DHCP_ATTACK_SEND_DISCOVER,     "sending DISCOVER packet",   NONDOS, dhcp_th_send_discover, NULL, 0 },*/
-  { DHCP_ATTACK_DOS_SEND_DISCOVER, "sending DISCOVER packet",   DOS,    CONTINOUS, dhcp_th_dos_send_discover,dhcp_dos_send_discover_params,
-                                                 SIZE_ARRAY(dhcp_dos_send_discover_params) },
+  { DHCP_ATTACK_DOS_SEND_DISCOVER, "sending DISCOVER packet",   DOS,    CONTINOUS, dhcp_th_dos_send_discover,NULL, 0 },
 /*  { DHCP_ATTACK_SEND_OFFER,        "sending OFFER packet",      NONDOS, dhcp_th_send_offer,    NULL, 0 },
   { DHCP_ATTACK_SEND_REQUEST,      "sending REQUEST packet",    NONDOS, dhcp_th_send_request,  NULL, 0 },
   { DHCP_ATTACK_SEND_DECLINE,      "sending DECLINE packet",    NONDOS, dhcp_th_send_decline,  NULL, 0 },

