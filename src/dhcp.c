@@ -98,13 +98,13 @@ dhcp_register(void)
 
 
 /*
- * Inicializa la estructura que se usa para relacionar el tmp_data
- * de cada nodo con los datos que se sacaran por pantalla cuando
- * se accede al demonio de red.
- * Teoricamente como esta funcion solo se llama desde term_add_node()
- * la cual, a su vez, solo es llamada al tener el mutex bloqueado por
- * lo que no veo necesario que sea reentrante. (Fredy). 
+ *  Initializes the structure that is used to relate the tmp_data
+    of each node with the data that will be displayed on the screen when the network daemon is accessed.
+    Theoretically, as this function is only called from term_add_node()
+    which, in turn, is only called when the mutex is locked,
+    so I don't see the need for it to be reentrant (Fredy). [comment was translated and may not be 100% accurate to original meaning] 
  */
+
 int8_t
 dhcp_init_comms_struct(struct term_node *node)
 {
@@ -149,7 +149,9 @@ dhcp_init_comms_struct(struct term_node *node)
     return 0;
 }
 
-
+/*************************************/
+/* NONDoS attack sending RAW packets */
+/*************************************/
 void dhcp_th_send_raw( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
@@ -182,7 +184,9 @@ void dhcp_th_send_raw( void *arg )
     dhcp_th_send_raw_exit(attacks);
 }
 
-
+/**************************************************/
+/* Clean up and finish attack sending RAW packets */
+/**************************************************/
 void dhcp_th_send_raw_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
@@ -192,7 +196,11 @@ void dhcp_th_send_raw_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
+/*
+This is the thread code for non-dos DHCP discover attack.
+This code is not in use, as this attack is commented out in the attack definition and likely not finished
 
+*/
 void dhcp_th_send_discover( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
@@ -215,7 +223,9 @@ void dhcp_th_send_discover( void *arg )
     dhcp_th_send_discover_exit(attacks);
 }
 
-
+/*
+This is a cleanup and exit function for the unused attack above
+*/
 void dhcp_th_send_discover_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
@@ -225,7 +235,11 @@ void dhcp_th_send_discover_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
-
+/*
+This function is called in the unsused attack above, as well as in the DOS version of the attack, which is operational
+Note: while the attack is operational and against CISCO switches fills up the address table AND denies all communication
+    When attacking EXOS target, the address table gets fileld out, but around 40% of communication still goes through
+*/
 int8_t
 dhcp_send_discover(struct attacks *attacks)
 {
@@ -249,7 +263,10 @@ dhcp_send_discover(struct attacks *attacks)
     return 0;
 }
 
-
+/*
+This is the thread function for the unused INFO packet attack
+This code currently servers no purpose, as the attack is not defined for this protocol
+*/
 void dhcp_th_send_inform( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
@@ -272,7 +289,9 @@ void dhcp_th_send_inform( void *arg )
     dhcp_th_send_inform_exit(attacks);
 }
 
-
+/* 
+This is the cleanup and exit function for the unused attack
+*/
 void dhcp_th_send_inform_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
@@ -282,6 +301,10 @@ void dhcp_th_send_inform_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
+/*
+This part of the code is responsible for sending the DHCP inform packet.
+Currently it is only called by the unused attack above and might not be complete
+*/
 int8_t
 dhcp_send_inform(struct attacks *attacks)
 {
@@ -339,9 +362,14 @@ void dhcp_th_send_offer_exit( struct attacks *attacks )
     pthread_mutex_unlock(&attacks->attack_th.finished);
     
     pthread_exit(NULL);
+
+    
 }
 
-
+/*
+While the attack utilising this type of packet is not defined (or rather the definition is commented out)
+This function is used by other attacks, mainly the DHCP rogue server attack.
+*/
 int8_t
 dhcp_send_offer(struct attacks *attacks)
 {
@@ -514,7 +542,9 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
     return 0;
 }
 
-
+/* This appears to be an implementation of thread code for sending DHCP DECLINE packets
+    It seems to be an attack which was never completed, as the only reference ot the function was commented out
+ *//
 void dhcp_th_send_decline( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
@@ -537,7 +567,9 @@ void dhcp_th_send_decline( void *arg )
     dhcp_th_send_decline_exit(attacks);
 }
 
-
+/*
+This is the function called to clean up and exit the attack above
+*/
 void dhcp_th_send_decline_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
@@ -547,7 +579,10 @@ void dhcp_th_send_decline_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
-
+/*
+This appears to be code used to construct and send a DHCP DECLINE packet
+it appears to be still unfinished and only function calling it is dhcp_th_send_decline
+*/
 int8_t
 dhcp_send_decline(struct attacks *attacks)
 {
@@ -586,9 +621,9 @@ dhcp_send_decline(struct attacks *attacks)
 }
 
 
-/*********************************/
+/***********************************/
 /* DoS attack sending DHCPDISCOVER */
-/*********************************/
+/***********************************/
 void dhcp_th_dos_send_discover( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
@@ -623,9 +658,9 @@ void dhcp_th_dos_send_discover( void *arg )
     dhcp_th_dos_send_discover_exit(attacks);
 }
 
-/************************************************/
-/* End / finish DoS attack sending DHCPDISCOVER */
-/************************************************/
+/*****************************************************/
+/* Clean up nad end  DoS attack sending DHCPDISCOVER */
+/*****************************************************/
 void dhcp_th_dos_send_discover_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
