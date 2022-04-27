@@ -544,7 +544,7 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 
 /* This appears to be an implementation of thread code for sending DHCP DECLINE packets
     It seems to be an attack which was never completed, as the only reference ot the function was commented out
- *//
+ */
 void dhcp_th_send_decline( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg;
