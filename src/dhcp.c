@@ -533,7 +533,7 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
     {
         //dhcp_data->mac_source = mac_before_spoof;
         memcpy((void *)dhcp_data->mac_source,(void *)mac_before_spoof,ETHER_ADDR_LEN);
-        write_log(1,"Error in dhcp_send_packet\n");
+        write_log(0,"Error in dhcp_send_packet\n");
         return -1;
     }
 
@@ -933,7 +933,7 @@ void dhcp_th_dos_send_release( void *arg )
     /* build and send an ARP request, write an error to the log and quit if returns -1
     This error can happen if we can't build the ARP header / can't build the Ethernet header / there is a write error in libnet */
     {
-        write_log(1, "Error in dhcp_send_arp_request\n");
+        write_log(0, "Error in dhcp_send_arp_request\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
 
@@ -942,7 +942,7 @@ void dhcp_th_dos_send_release( void *arg )
     //NOTE - The attack used to fail in this spot, however it has been resolved and now teh attack fails further on, however on the same function
     if (dhcp_learn_mac(attacks, aux_long1, arp_server) < 0)
     {
-        write_log(1, "Error in dhcp_learn_mac for the server\n");
+        write_log(0, "Error in dhcp_learn_mac for the server\n");
         dhcp_th_dos_send_release_exit(attacks);
     }
     thread_usleep(10000000); // sleep for 5 seconds to see if there's arp throttling
@@ -955,7 +955,7 @@ void dhcp_th_dos_send_release( void *arg )
 
         if (dhcp_send_arp_request(attacks, aux_long) < 0)
         {
-            write_log(1, "Error in dhcp_send_arp_request\n");
+            write_log(0, "Error in dhcp_send_arp_request\n");
             dhcp_th_dos_send_release_exit(attacks);
         }
 
@@ -963,12 +963,12 @@ void dhcp_th_dos_send_release( void *arg )
         if (dhcp_learn_mac(attacks, aux_long, arp_mac) < 0)
         {
             // NOTE - Right now the attack dies right here, as the packet seems to be the exact same as the server one (which gets a reply successfully), just with a different address, arp requests might be throttled by the router?
-            write_log(1, "Error in dhcp_learn_mac\n");
+            write_log(0, "Error in dhcp_learn_mac\n");
             /*dhcp_dos_send_release_exit(attacks);*/
         } else
         if (dhcp_send_release(attacks, aux_long1, aux_long, arp_server, arp_mac) < 0)
         {
-            write_log(1, "Error in dhcp_send_release\n");
+            write_log(0, "Error in dhcp_send_release\n");
             
             dhcp_th_dos_send_release_exit(attacks);
         }
@@ -1041,7 +1041,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
         if (t == -1)
         {
             thread_libnet_error("Can't build arp header",lhandler);
-            write_log(1,"Can't build arp header!");
+            write_log(0,"Can't build arp header!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -1062,7 +1062,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
         if (t == -1)
         {
             thread_libnet_error("Can't build ethernet header",lhandler);
-            write_log(1,"Can't build ethernet header!");
+            write_log(0,"Can't build ethernet header!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -1074,7 +1074,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
 
         if (sent == -1) {
             thread_libnet_error("libnet_write error", lhandler);
-            write_log(1,"Libnet write erre!");
+            write_log(0,"Libnet write erre!");
             libnet_clear_packet(lhandler);
             return -1;
         }
@@ -1126,7 +1126,7 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //
         if ( interfaces_get_packet( attacks->used_ints, NULL, &attacks->attack_th.stop, p_data.header, p_data.packet, PROTO_ARP, 5 ) == NULL ) 
         {
             //Here is the exact moment that the DHCP release DoS fails. If other atacks can make use of this func normally, then it means that ir's an issue with data sent?
-            write_log(1, "Timeout waiting for an ARP Reply...\n");
+            write_log(0, "Timeout waiting for an ARP Reply...\n");
             break;
         }
 
@@ -1148,7 +1148,7 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //
 
             memcpy( (void *)arp_mac, (void *)ether->ether_shost, 6 );
 
-            write_log(1, " ARP Pillada MAC = %02X:%02X:%02X:%02X:%02X:%02X\n", ether->ether_shost[0], ether->ether_shost[1], ether->ether_shost[2],
+            write_log(0, " Learned MAC = %02X:%02X:%02X:%02X:%02X:%02X\n", ether->ether_shost[0], ether->ether_shost[1], ether->ether_shost[2],
                                                                                ether->ether_shost[3], ether->ether_shost[4], ether->ether_shost[5]);
              
             gotit = 1;
@@ -1208,7 +1208,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1) // I don't know if thread_libnet_error's also pop up in the main log, so it shouldn't hurt to add regular ones too
             {
                 thread_libnet_error( "Can't build dhcp packet",lhandler);
-                write_log(1,"Can't build dhcp packet");
+                write_log(0,"Can't build dhcp packet");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1227,7 +1227,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1) 
             {
                 thread_libnet_error( "Can't build udp datagram",lhandler);
-                write_log(1,"Can't build udp datagram");
+                write_log(0,"Can't build udp datagram");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1251,7 +1251,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1) 
             {
                 thread_libnet_error("Can't build ipv4 packet",lhandler);
-                write_log(1,"Can't build ipv4 packet");
+                write_log(0,"Can't build ipv4 packet");
                 libnet_clear_packet(lhandler);
                 return -1;
             }  
@@ -1269,7 +1269,7 @@ dhcp_send_packet(struct attacks *attacks)
             if (t == -1)
             {
                 thread_libnet_error("Can't build ethernet header",lhandler);
-                write_log(1,"Can't build ethernet header");
+                write_log(0,"Can't build ethernet header");
                 libnet_clear_packet(lhandler);
                 return -1;
             }
@@ -1281,7 +1281,7 @@ dhcp_send_packet(struct attacks *attacks)
 
             if (sent == -1) {
                 thread_libnet_error("libnet_write error", lhandler);
-                write_log(1,"libnet_write error");
+                write_log(0,"libnet_write error");
                 libnet_clear_packet(lhandler);
                 return -1;
             }
